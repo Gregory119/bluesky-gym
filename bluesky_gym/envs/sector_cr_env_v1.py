@@ -433,8 +433,11 @@ class SectorCREnvMod(gym.Env):
             # Determine color
             if tot_separation < INTRUSION_DISTANCE:
                 color = (220,20,60)
-            else: 
+            # if intruder altitude is in range
+            elif abs(vertical_separation) < INTRUSION_DISTANCE:
                 color = (80,80,80)
+            else:
+                color = (255,255,255)
 
             x_pos = (self.window_width/2)+(np.cos(np.deg2rad(int_qdr))*(int_dis * NM2KM)*px_per_km)
             y_pos = (self.window_height/2)-(np.sin(np.deg2rad(int_qdr))*(int_dis * NM2KM)*px_per_km)
