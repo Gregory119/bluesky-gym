@@ -55,13 +55,16 @@ class SectorCREnvMod(gym.Env):
                 "cos(drift)": spaces.Box(-1, 1, shape=(1,), dtype=np.float64),
                 "sin(drift)": spaces.Box(-1, 1, shape=(1,), dtype=np.float64),
                 "airspeed": spaces.Box(-1, 1, shape=(1,), dtype=np.float64),
-                "x_r": spaces.Box(-np.inf, np.inf, shape=(NUM_AC_STATE,), dtype=np.float64),
-                "y_r": spaces.Box(-np.inf, np.inf, shape=(NUM_AC_STATE,), dtype=np.float64),
-                "vx_r": spaces.Box(-np.inf, np.inf, shape=(NUM_AC_STATE,), dtype=np.float64),
-                "vy_r": spaces.Box(-np.inf, np.inf, shape=(NUM_AC_STATE,), dtype=np.float64),
-                "cos(track)": spaces.Box(-np.inf, np.inf, shape=(NUM_AC_STATE,), dtype=np.float64),
-                "sin(track)": spaces.Box(-np.inf, np.inf, shape=(NUM_AC_STATE,), dtype=np.float64),
-                "distances": spaces.Box(-np.inf, np.inf, shape=(NUM_AC_STATE,), dtype=np.float64)
+                "x_r": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                "y_r": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                "vx_r": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                "vy_r": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                "cos(track)": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                "sin(track)": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                "distances": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                # new
+                "altitude_difference": spaces.Box(-1, 1, shape = (NUM_INTRUDERS,), dtype=np.float64),
+                #"vz_r": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
             }
         )
 
@@ -251,6 +254,7 @@ class SectorCREnvMod(gym.Env):
         self.cos_track = np.array([])
         self.sin_track = np.array([])
         self.distances = np.array([])
+        altitude_difference = []
 
         # Drift of agent aircraft for reward calculation
         drift = 0
@@ -299,17 +303,26 @@ class SectorCREnvMod(gym.Env):
 
             self.distances = np.append(self.distances, distances[ac_idx-1])
 
+        ac_idx = bs.traf.id2idx(ACTOR)
+        for i in range(self.num_ac-1):
+            int_idx = i+1
+            # Intruder altitude difference to AC
+            alt_dif = bs.traf.alt[int_idx] - bs.traf.alt[ac_idx]
+            altitude_difference.append(alt_dif)
+        assert len(altitude_difference) == NUM_INTRUDERS
+            
         observation = {
             "cos(drift)": self.cos_drift,
             "sin(drift)": self.sin_drift,
             "airspeed": (self.airspeed-150)/6,
-            "x_r": self.x_r[:NUM_AC_STATE]/13000,
-            "y_r": self.y_r[:NUM_AC_STATE]/13000,
-            "vx_r": self.vx_r[:NUM_AC_STATE]/32,
-            "vy_r": self.vy_r[:NUM_AC_STATE]/66,
-            "cos(track)": self.cos_track[:NUM_AC_STATE],
-            "sin(track)": self.sin_track[:NUM_AC_STATE],
-            "distances": (self.distances[:NUM_AC_STATE]-50000.)/15000.
+            "x_r": self.x_r[:NUM_INTRUDERS]/13000,
+            "y_r": self.y_r[:NUM_INTRUDERS]/13000,
+            "vx_r": self.vx_r[:NUM_INTRUDERS]/32,
+            "vy_r": self.vy_r[:NUM_INTRUDERS]/66,
+            "cos(track)": self.cos_track[:NUM_INTRUDERS],
+            "sin(track)": self.sin_track[:NUM_INTRUDERS],
+            "distances": (self.distances[:NUM_INTRUDERS]-50000.)/15000,
+            "altitude_difference": np.array(altitude_difference)/MAX_ALT_CHANGE,
         }
 
         return observation
