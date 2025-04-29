@@ -333,7 +333,11 @@ class SectorCREnvMod(gym.Env):
         reward = 0
         for i in range(self.num_ac-1):
             int_idx = i+1
-            _, int_dis = bs.tools.geo.kwikqdrdist(bs.traf.lat[ac_idx], bs.traf.lon[ac_idx], bs.traf.lat[int_idx], bs.traf.lon[int_idx])
+            # calculate 3D distance between aircraft and intruder
+            _, int_hor_dis = bs.tools.geo.kwikqdrdist(bs.traf.lat[ac_idx], bs.traf.lon[ac_idx], bs.traf.lat[int_idx], bs.traf.lon[int_idx])
+            int_vert_dis = abs(bs.traf.alt[int_idx] - bs.traf.alt[ac_idx])
+            int_dis = np.sqrt(int_hor_dis**2 + int_vert_dis**2)
+            # check if intruder is too close
             if int_dis < INTRUSION_DISTANCE:
                 self.total_intrusions += 1
                 reward += INTRUSION_PENALTY
@@ -401,10 +405,12 @@ class SectorCREnvMod(gym.Env):
             heading_end_y = np.sin(np.deg2rad(int_hdg)) * ac_length
 
             int_qdr, int_dis = bs.tools.geo.kwikqdrdist(CENTER[0], CENTER[1], bs.traf.lat[int_idx], bs.traf.lon[int_idx])
-            separation = bs.tools.geo.kwikdist(bs.traf.lat[ac_idx], bs.traf.lon[ac_idx], bs.traf.lat[int_idx], bs.traf.lon[int_idx])
-
+            horizontal_separation = bs.tools.geo.kwikdist(bs.traf.lat[ac_idx], bs.traf.lon[ac_idx], bs.traf.lat[int_idx], bs.traf.lon[int_idx])
+            vertical_separation = abs(bs.traf.alt[int_idx] - bs.traf.alt[ac_idx])
+            tot_separation = np.sqrt(horizontal_separation**2 + vertical_separation**2)
+            
             # Determine color
-            if separation < INTRUSION_DISTANCE:
+            if tot_separation < INTRUSION_DISTANCE:
                 color = (220,20,60)
             else: 
                 color = (80,80,80)
