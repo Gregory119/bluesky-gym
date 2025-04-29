@@ -31,7 +31,7 @@ MAX_ALT_CHANGE = 3*INTRUSION_DISTANCE
 
 # Model parameters
 ACTION_FREQUENCY = 5
-NUM_AC_STATE = 4
+NUM_INTRUDERS = 15
 DRIFT_PENALTY = -0.1
 INTRUSION_PENALTY = -1
 D_HEADING = 22.5 # deg
@@ -98,13 +98,21 @@ class SectorCREnvMod(gym.Env):
         self.average_drift = np.array([])
        
         self._generate_polygon() # Create airspace polygon
+
+        # The problem here is that the number of total aircraft can change, but
+        # the observation should include the state of all aircraft. The state
+        # assumed a fixed number of aircraft, but this code could generate more,
+        # meaning the observation could miss that state of some
+        # aircraft. Instead fix the number of aircraft so that the observation
+        # always includes their state.
+        self.num_ac = NUM_INTRUDERS+1
         
-        if self.density_mode == "normal":
-            rand_density = np.random.normal(AC_DENSITY_MU, AC_DENSITY_SIGMA)
-            self.num_ac = int(max(np.ceil(rand_density * self.poly_area), NUM_AC_STATE+1)) # Get total number of AC in the airspace including agent (min = 3)
-        else:
-            rand_density = np.random.uniform(*AC_DENSITY_RANGE)
-            self.num_ac = int(max(np.ceil(rand_density * self.poly_area), NUM_AC_STATE+1)) # Get total number of AC in the airspace including agent (min = 3)
+        #        if self.density_mode == "normal":
+        #            rand_density = np.random.normal(AC_DENSITY_MU, AC_DENSITY_SIGMA)
+        #            self.num_ac = int(max(np.ceil(rand_density * self.poly_area), NUM_INTRUDERS+1)) # Get total number of AC in the airspace including agent (min = 3)
+        #        else:
+        #            rand_density = np.random.uniform(*AC_DENSITY_RANGE)
+        #            self.num_ac = int(max(np.ceil(rand_density * self.poly_area), NUM_INTRUDERS+1)) # Get total number of AC in the airspace including agent (min = 3)
         
         self._generate_waypoints() # Create waypoints for aircraft
         self._generate_ac() # Create aircraft in the airspace
