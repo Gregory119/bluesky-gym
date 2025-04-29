@@ -27,6 +27,7 @@ MpS2Kt = 1.94384
 FL2M = 30.48
 
 INTRUSION_DISTANCE = 5 # NM
+MAX_ALT_CHANGE = 3*INTRUSION_DISTANCE
 
 # Model parameters
 ACTION_FREQUENCY = 5
@@ -209,12 +210,13 @@ class SectorCREnvMod(gym.Env):
         
         # Actor AC is the only one that has ACTOR as acid
         bs.traf.cre(ACTOR, actype=AC_TYPE, aclat=init_pos_agent[0], aclon=init_pos_agent[1], achdg=hdg_agent, acspd=AC_SPD, acalt=ALTITUDE)
-        
         for i in range(1, len(init_p_latlong)):
             wpt = fn.nm_to_latlong(CENTER, self.wpts[i])
             init_pos = init_p_latlong[i]
             hdg = fn.get_hdg(init_pos, wpt)
-            bs.traf.cre(acid=str(i), actype=AC_TYPE, aclat=init_pos[0], aclon=init_pos[1], achdg=hdg, acspd=AC_SPD, acalt=ALTITUDE)
+            # center the altitude range about the altitude of the target aircraft
+            alt = np.random.uniform(ALTITUDE-MAX_ALT_CHANGE/2, ALTITUDE+MAX_ALT_CHANGE/2)
+            bs.traf.cre(acid=str(i), actype=AC_TYPE, aclat=init_pos[0], aclon=init_pos[1], achdg=hdg, acspd=AC_SPD, acalt=alt)
     
     def _get_info(self):
         # Here you implement any additional info that you want to log after an episode
