@@ -26,8 +26,8 @@ NM2KM = 1.852
 MpS2Kt = 1.94384
 FL2M = 30.48
 
-INTRUSION_DISTANCE = 5 # NM
-MAX_ALT_CHANGE = 3*INTRUSION_DISTANCE
+INTRUSION_DISTANCE = 3*5 # NM, increased this by 3 times so that the AC would be intruded more often
+MAX_ALT_CHANGE = 10*INTRUSION_DISTANCE # distance between lower and upper altitude bounds of airspace
 
 # Model parameters
 ACTION_FREQUENCY = 5
@@ -148,7 +148,18 @@ class SectorCREnvMod(gym.Env):
     
     def _check_inside_airspace(self):
         ac_idx = bs.traf.id2idx(ACTOR)
-        if bs.tools.areafilter.checkInside(self.poly_name, np.array([bs.traf.lat[ac_idx]]), np.array([bs.traf.lon[ac_idx]]), np.array([ALTITUDE*FL2M])):
+        inside_horizontal = bs.tools.areafilter.checkInside(self.poly_name, np.array([bs.traf.lat[ac_idx]]), np.array([bs.traf.lon[ac_idx]]), np.array([ALTITUDE*FL2M]))
+        lower_vert = ALTITUDE - MAX_ALT_CHANGE/2
+        upper_vert = ALTITUDE + MAX_ALT_CHANGE/2
+        curr_alt = bs.traf.alt[ac_idx]
+        inside_vertical = (curr_alt >= lower_vert) and (curr_alt <= upper_vert)
+        inside = inside_horizontal and inside_vertical
+
+        # print("curr alt: {}".format(curr_alt))
+        # print("upper limit: {}, lower limit: {}".format(upper_vert, lower_vert))
+        
+        if not inside:
+            # print("!!!!!!!!!!outside airspace")
             return False
         else:
             return True
@@ -339,6 +350,7 @@ class SectorCREnvMod(gym.Env):
         return observation
     
     def _get_action(self, action):
+        # handle heading and horizontal speed
         dh = action[0] * D_HEADING
         dv = action[1] * D_VELOCITY
         heading_new = fn.bound_angle_positive_negative_180(bs.traf.hdg[bs.traf.id2idx(ACTOR)] + dh)
