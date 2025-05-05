@@ -64,7 +64,7 @@ tensorboard = "^2.19.0"
 debugpy = "^1.8.13"
 pygame = "^2.6.1"
 scipy = "^1.15.2"
-stable-baselines3 = "^2.6.0"
+stable-baselines3 = {extras = ["extra"], version = "^2.6.0"}
 
 [[tool.poetry.source]]
 name = "pytorch-gpu-src"
