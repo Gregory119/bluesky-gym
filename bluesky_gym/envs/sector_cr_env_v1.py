@@ -37,6 +37,9 @@ INTRUSION_PENALTY = -1
 D_HEADING = 22.5 # deg
 D_VELOCITY = 20/3 # kts
 
+ACTION_2_MS = 1  # this is low so that the AC doesn't exit the airspace too quickly
+
+
 class SectorCREnvMod(gym.Env):
     """ 
     Sector Conflict Resolution Environment
@@ -68,7 +71,7 @@ class SectorCREnvMod(gym.Env):
             }
         )
 
-        self.action_space = spaces.Box(-1, 1, shape=(2,), dtype=np.float64)
+        self.action_space = spaces.Box(-1, 1, shape=(3,), dtype=np.float64)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -343,6 +346,24 @@ class SectorCREnvMod(gym.Env):
 
         bs.stack.stack(f"HDG {ACTOR} {heading_new}")
         bs.stack.stack(f"SPD {ACTOR} {speed_new}")
+
+        # handle vertical velocity
+        
+        # Transform action to meters per second
+        vert_vel_action = action[2] * ACTION_2_MS
+
+        # Bluesky interpretes vertical velocity command through altitude commands 
+        # with a vertical speed (magnitude). So check sign of action and give arbitrary 
+        # altitude command
+
+        # The actions are then executed through stack commands;
+        if vert_vel_action >= 0:
+            bs.traf.selalt[0] = 1000000 # High target altitude to start climb
+            bs.traf.selvs[0] = vert_vel_action
+        else:
+            bs.traf.selalt[0] = 0 # low target altitude to start descent
+            bs.traf.selvs[0] = vert_vel_action
+        
 
     def _check_drift(self):
         drift = abs(np.deg2rad(self.drift))
