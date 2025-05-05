@@ -34,11 +34,23 @@ def register_envs():
     )
 
     register(
+        id="SectorCREnv-v1",
+        entry_point="bluesky_gym.envs.sector_cr_env_v1:SectorCREnvMod",
+        max_episode_steps=200,
+    )
+    
+    register(
         id="StaticObstacleEnv-v0",
         entry_point="bluesky_gym.envs.static_obstacle_env:StaticObstacleEnv",
         max_episode_steps=100,
     )
 
+    register(
+        id="StaticObstacleEnv-v1",
+        entry_point="bluesky_gym.envs.static_obstacle_env_v1:StaticObstacleEnvMod",
+        max_episode_steps=100,
+    )
+    
     register(
         id="MergeEnv-v0",
         entry_point="bluesky_gym.envs.merge_env:MergeEnv",
