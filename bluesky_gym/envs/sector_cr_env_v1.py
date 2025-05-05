@@ -141,10 +141,10 @@ class SectorCREnvMod(gym.Env):
         reward = self._get_reward()
         info = self._get_info()
 
-        # truncate instead of terminate to avoid aircraft learning to exit sector fast
-        truncate = self._check_inside_airspace()
+        # terminate when moving outside the airspaceg
+        terminate = not self._check_inside_airspace()
 
-        return observation, reward, False, truncate, info
+        return observation, reward, terminate, False, info
     
     def _check_inside_airspace(self):
         ac_idx = bs.traf.id2idx(ACTOR)
