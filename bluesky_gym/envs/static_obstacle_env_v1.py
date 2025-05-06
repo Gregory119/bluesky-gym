@@ -66,8 +66,9 @@ class StaticObstacleEnvMod(gym.Env):
                 "restricted_area_radius": spaces.Box(0, 1, shape = (NUM_OBSTACLES,), dtype=np.float64),
                 "restricted_area_distance": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES, ), dtype=np.float64),
                 "cos_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
-                "sin_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64)
-
+                "sin_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
+                "altitude_difference": spaces.Box(-1, 1, shape = (NUM_OBSTACLES,), dtype=np.float64),
+                #"vertical_speed": spaces.Box(-1, 1, shape=(1,), dtype=np.float64),
             }
         )
        
@@ -171,6 +172,7 @@ class StaticObstacleEnvMod(gym.Env):
         for name in self.obstacle_names:
             bs.tools.areafilter.deleteArea(name)
 
+        self.obstacle_alts = []
         self.obstacle_names = []
         self.obstacle_vertices = []
         self.obstacle_radius = []
@@ -186,6 +188,7 @@ class StaticObstacleEnvMod(gym.Env):
 
             # random obstacle height within range
             alt = np.random.uniform(ALTITUDE-MAX_ALT_CHANGE/2, ALTITUDE+MAX_ALT_CHANGE/2)
+            self.obstacle_alts.append(alt)
             bs.tools.areafilter.defineArea(poly_name, 'POLY', points, top=alt+INTRUSION_DISTANCE, bottom=alt-INTRUSION_DISTANCE)
             self.obstacle_names.append(poly_name)
 
@@ -239,6 +242,7 @@ class StaticObstacleEnvMod(gym.Env):
     def _get_obs(self):
         ac_idx = bs.traf.id2idx('KL001')
 
+        altitude_difference = []
         self.destination_waypoint_distance = []
         self.wpt_qdr = []
         self.destination_waypoint_cos_drift = []
@@ -275,6 +279,11 @@ class StaticObstacleEnvMod(gym.Env):
             self.obstacle_centre_cos_bearing.append(np.cos(np.deg2rad(bearing)))
             self.obstacle_centre_sin_bearing.append(np.sin(np.deg2rad(bearing)))
 
+            # altitude differences between the AC and each obstacle
+            alt_dif = self.obstacle_alts[obs_idx] - bs.traf.alt[ac_idx]
+            altitude_difference.append(alt_dif)
+        assert len(altitude_difference) == NUM_OBSTACLES
+
         observation = {
                 "destination_waypoint_distance": np.array(self.destination_waypoint_distance)/WAYPOINT_DISTANCE_MAX,
                 "destination_waypoint_cos_drift": np.array(self.destination_waypoint_cos_drift),
@@ -283,6 +292,8 @@ class StaticObstacleEnvMod(gym.Env):
                 "restricted_area_distance": np.array(self.obstacle_centre_distance)/WAYPOINT_DISTANCE_MAX,
                 "cos_difference_restricted_area_pos": np.array(self.obstacle_centre_cos_bearing),
                 "sin_difference_restricted_area_pos": np.array(self.obstacle_centre_sin_bearing),
+                "altitude_difference": np.array(altitude_difference)/MAX_ALT_CHANGE,
+                #"vertical_speed": vertical_speed,
             }
 
         return observation
