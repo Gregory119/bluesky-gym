@@ -15,7 +15,7 @@ REACH_REWARD = 1 # reach set waypoint
 DRIFT_PENALTY = -0.01
 RESTRICTED_AREA_INTRUSION_PENALTY = -5
 
-INTRUSION_DISTANCE = 5 # NM
+INTRUSION_DISTANCE = 100 # NM
 
 WAYPOINT_DISTANCE_MIN = 100 # KM
 WAYPOINT_DISTANCE_MAX = 170 # KM
@@ -28,19 +28,23 @@ D_SPEED = 20/3 # kts (check)
 
 AC_SPD = 150 # kts
 ALTITUDE = 350 # In FL
+MAX_ALT_CHANGE = 5*INTRUSION_DISTANCE
 
 NM2KM = 1.852
 MpS2Kt = 1.94384
 
 ACTION_FREQUENCY = 10
 
-NUM_OBSTACLES = 10
+NUM_OBSTACLES = 15
 NUM_WAYPOINTS = 1
 
 OBSTACLE_AREA_RANGE = (50, 1000) # In NM^2
 CENTER = (51.990426702297746, 4.376124857109851) # TU Delft AE Faculty coordinates
 
 MAX_DISTANCE = 350 # width of screen in km
+
+ACTION_2_MS = 1.0
+
 
 class StaticObstacleEnvMod(gym.Env):
     """ 
@@ -65,12 +69,13 @@ class StaticObstacleEnvMod(gym.Env):
                 "restricted_area_radius": spaces.Box(0, 1, shape = (NUM_OBSTACLES,), dtype=np.float64),
                 "restricted_area_distance": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES, ), dtype=np.float64),
                 "cos_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
-                "sin_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64)
-
+                "sin_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
+                "altitude_difference": spaces.Box(-1, 1, shape = (NUM_OBSTACLES,), dtype=np.float64),
+                "vertical_speed": spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float64),
             }
         )
        
-        self.action_space = spaces.Box(-1, 1, shape=(2,), dtype=np.float64)
+        self.action_space = spaces.Box(-1, 1, shape=(3,), dtype=np.float64)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -170,6 +175,7 @@ class StaticObstacleEnvMod(gym.Env):
         for name in self.obstacle_names:
             bs.tools.areafilter.deleteArea(name)
 
+        self.obstacle_alts = []
         self.obstacle_names = []
         self.obstacle_vertices = []
         self.obstacle_radius = []
@@ -182,7 +188,11 @@ class StaticObstacleEnvMod(gym.Env):
             
             points = [coord for point in p for coord in point] # Flatten the list of points
             poly_name = 'restricted_area_' + str(i+1)
-            bs.tools.areafilter.defineArea(poly_name, 'POLY', points)
+
+            # random obstacle height within range
+            alt = np.random.uniform(ALTITUDE-MAX_ALT_CHANGE/2, ALTITUDE+MAX_ALT_CHANGE/2)
+            self.obstacle_alts.append(alt)
+            bs.tools.areafilter.defineArea(poly_name, 'POLY', points, top=alt+INTRUSION_DISTANCE, bottom=alt-INTRUSION_DISTANCE)
             self.obstacle_names.append(poly_name)
 
             obstacle_vertices_coordinates = []
@@ -235,6 +245,7 @@ class StaticObstacleEnvMod(gym.Env):
     def _get_obs(self):
         ac_idx = bs.traf.id2idx('KL001')
 
+        altitude_difference = []
         self.destination_waypoint_distance = []
         self.wpt_qdr = []
         self.destination_waypoint_cos_drift = []
@@ -271,6 +282,14 @@ class StaticObstacleEnvMod(gym.Env):
             self.obstacle_centre_cos_bearing.append(np.cos(np.deg2rad(bearing)))
             self.obstacle_centre_sin_bearing.append(np.sin(np.deg2rad(bearing)))
 
+            # altitude differences between the AC and each obstacle
+            alt_dif = self.obstacle_alts[obs_idx] - bs.traf.alt[ac_idx]
+            altitude_difference.append(alt_dif)
+        assert len(altitude_difference) == NUM_OBSTACLES
+
+        # Get agent vertical speed (normalized)
+        vertical_speed = np.array([bs.traf.selvs[0]]) / ACTION_2_MS
+
         observation = {
                 "destination_waypoint_distance": np.array(self.destination_waypoint_distance)/WAYPOINT_DISTANCE_MAX,
                 "destination_waypoint_cos_drift": np.array(self.destination_waypoint_cos_drift),
@@ -279,6 +298,8 @@ class StaticObstacleEnvMod(gym.Env):
                 "restricted_area_distance": np.array(self.obstacle_centre_distance)/WAYPOINT_DISTANCE_MAX,
                 "cos_difference_restricted_area_pos": np.array(self.obstacle_centre_cos_bearing),
                 "sin_difference_restricted_area_pos": np.array(self.obstacle_centre_sin_bearing),
+                "altitude_difference": np.array(altitude_difference)/MAX_ALT_CHANGE,
+                "vertical_speed": vertical_speed,
             }
 
         return observation
@@ -346,6 +367,24 @@ class StaticObstacleEnvMod(gym.Env):
         bs.stack.stack(f"HDG {'KL001'} {heading_new}")
         bs.stack.stack(f"SPD {'KL001'} {speed_new}")
 
+        # handle vertical velocity
+        
+        # Transform action to meters per second
+        vert_vel_action = action[2] * ACTION_2_MS
+
+        # Bluesky interpretes vertical velocity command through altitude commands 
+        # with a vertical speed (magnitude). So check sign of action and give arbitrary 
+        # altitude command
+
+        # The actions are then executed through stack commands;
+        if vert_vel_action >= 0:
+            bs.traf.selalt[0] = 1000000 # High target altitude to start climb
+            bs.traf.selvs[0] = vert_vel_action
+        else:
+            bs.traf.selalt[0] = 0 # low target altitude to start descent
+            bs.traf.selvs[0] = vert_vel_action
+        
+
     def _render_frame(self):
         if self.window is None and self.render_mode == "human":
             pygame.init()
@@ -393,7 +432,7 @@ class StaticObstacleEnvMod(gym.Env):
         )
 
         # draw obstacles
-        for vertices in self.obstacle_vertices:
+        for i, vertices in enumerate(self.obstacle_vertices):
             points = []
             for coord in vertices:
                 lat_ref = coord[0]
@@ -403,8 +442,18 @@ class StaticObstacleEnvMod(gym.Env):
                 x_ref = (np.sin(np.deg2rad(qdr))*dis)/MAX_DISTANCE*self.window_width
                 y_ref = (-np.cos(np.deg2rad(qdr))*dis)/MAX_DISTANCE*self.window_width
                 points.append((x_ref, y_ref))
+
+            # if obstacle height in range, then set obstacle color red
+            obs_alt = self.obstacle_alts[i]
+            upper = obs_alt+INTRUSION_DISTANCE
+            lower = obs_alt-INTRUSION_DISTANCE
+            ac_alt = bs.traf.alt[ac_idx]
+            if ac_alt <= upper and ac_alt >= lower:
+                color = (220,20,60) # red
+            else:
+                color = (0,0,0)
             pygame.draw.polygon(canvas,
-                (0,0,0), points
+                color, points
             )
 
         # draw target waypoint
