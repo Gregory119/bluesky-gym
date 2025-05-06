@@ -142,9 +142,15 @@ class SectorCREnvMod(gym.Env):
         info = self._get_info()
 
         # terminate when moving outside the airspaceg
-        terminate = not self._check_inside_airspace()
+        inside_vert, inside_hor = self._check_inside_airspace()
+        terminate = not inside_hor
 
-        return observation, reward, terminate, False, info
+        # Allow the AC to move above or below all the intruders and then exit
+        # the airspace horizontally. So don't terminate or truncate when outside
+        # vertical airspace/band.
+        truncate = False
+
+        return observation, reward, terminate, truncate, info
     
     def _check_inside_airspace(self):
         ac_idx = bs.traf.id2idx(ACTOR)
@@ -157,12 +163,8 @@ class SectorCREnvMod(gym.Env):
 
         # print("curr alt: {}".format(curr_alt))
         # print("upper limit: {}, lower limit: {}".format(upper_vert, lower_vert))
-        
-        if not inside:
-            # print("!!!!!!!!!!outside airspace")
-            return False
-        else:
-            return True
+
+        return inside_vertical, inside_horizontal
 
     def _generate_polygon(self):
         
