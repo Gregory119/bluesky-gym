@@ -72,7 +72,7 @@ class StaticObstacleEnvMod(gym.Env):
             }
         )
        
-        self.action_space = spaces.Box(-1, 1, shape=(2,), dtype=np.float64)
+        self.action_space = spaces.Box(-1, 1, shape=(3,), dtype=np.float64)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -360,6 +360,24 @@ class StaticObstacleEnvMod(gym.Env):
 
         bs.stack.stack(f"HDG {'KL001'} {heading_new}")
         bs.stack.stack(f"SPD {'KL001'} {speed_new}")
+
+        # handle vertical velocity
+        
+        # Transform action to meters per second
+        vert_vel_action = action[2] * ACTION_2_MS
+
+        # Bluesky interpretes vertical velocity command through altitude commands 
+        # with a vertical speed (magnitude). So check sign of action and give arbitrary 
+        # altitude command
+
+        # The actions are then executed through stack commands;
+        if vert_vel_action >= 0:
+            bs.traf.selalt[0] = 1000000 # High target altitude to start climb
+            bs.traf.selvs[0] = vert_vel_action
+        else:
+            bs.traf.selalt[0] = 0 # low target altitude to start descent
+            bs.traf.selvs[0] = vert_vel_action
+        
 
     def _render_frame(self):
         if self.window is None and self.render_mode == "human":
