@@ -67,7 +67,7 @@ class SectorCREnvMod(gym.Env):
                 "distances": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
                 # new
                 "altitude_difference": spaces.Box(-1, 1, shape = (NUM_INTRUDERS,), dtype=np.float64),
-                #"vz_r": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                "vertical_speed": spaces.Box(-1, 1, shape=(1,), dtype=np.float64),
             }
         )
 
@@ -296,6 +296,9 @@ class SectorCREnvMod(gym.Env):
         # Get agent aircraft airspeed, m/s
         self.airspeed = np.append(self.airspeed, bs.traf.tas[ac_idx])
 
+        # Get agent vertical speed (normalized)
+        vertical_speed = np.array([bs.traf.selvs[0]]) / ACTION_2_MS
+
         vx = np.cos(np.deg2rad(ac_hdg)) * bs.traf.tas[ac_idx]
         vy = np.sin(np.deg2rad(ac_hdg)) * bs.traf.tas[ac_idx]
 
@@ -345,6 +348,7 @@ class SectorCREnvMod(gym.Env):
             "sin(track)": self.sin_track[:NUM_INTRUDERS],
             "distances": (self.distances[:NUM_INTRUDERS]-50000.)/15000,
             "altitude_difference": np.array(altitude_difference)/MAX_ALT_CHANGE,
+            "vertical_speed": vertical_speed,
         }
 
         return observation
