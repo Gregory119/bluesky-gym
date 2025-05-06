@@ -15,7 +15,7 @@ REACH_REWARD = 1 # reach set waypoint
 DRIFT_PENALTY = -0.01
 RESTRICTED_AREA_INTRUSION_PENALTY = -5
 
-INTRUSION_DISTANCE = 5 # NM
+INTRUSION_DISTANCE = 100 # NM
 
 WAYPOINT_DISTANCE_MIN = 100 # KM
 WAYPOINT_DISTANCE_MAX = 170 # KM
@@ -28,14 +28,14 @@ D_SPEED = 20/3 # kts (check)
 
 AC_SPD = 150 # kts
 ALTITUDE = 350 # In FL
-MAX_ALT_CHANGE = 10*INTRUSION_DISTANCE
+MAX_ALT_CHANGE = 5*INTRUSION_DISTANCE
 
 NM2KM = 1.852
 MpS2Kt = 1.94384
 
 ACTION_FREQUENCY = 10
 
-NUM_OBSTACLES = 10
+NUM_OBSTACLES = 15
 NUM_WAYPOINTS = 1
 
 OBSTACLE_AREA_RANGE = (50, 1000) # In NM^2
@@ -426,7 +426,7 @@ class StaticObstacleEnvMod(gym.Env):
         )
 
         # draw obstacles
-        for vertices in self.obstacle_vertices:
+        for i, vertices in enumerate(self.obstacle_vertices):
             points = []
             for coord in vertices:
                 lat_ref = coord[0]
@@ -436,8 +436,18 @@ class StaticObstacleEnvMod(gym.Env):
                 x_ref = (np.sin(np.deg2rad(qdr))*dis)/MAX_DISTANCE*self.window_width
                 y_ref = (-np.cos(np.deg2rad(qdr))*dis)/MAX_DISTANCE*self.window_width
                 points.append((x_ref, y_ref))
+
+            # if obstacle height in range, then set obstacle color red
+            obs_alt = self.obstacle_alts[i]
+            upper = obs_alt+INTRUSION_DISTANCE
+            lower = obs_alt-INTRUSION_DISTANCE
+            ac_alt = bs.traf.alt[ac_idx]
+            if ac_alt <= upper and ac_alt >= lower:
+                color = (220,20,60) # red
+            else:
+                color = (0,0,0)
             pygame.draw.polygon(canvas,
-                (0,0,0), points
+                color, points
             )
 
         # draw target waypoint
