@@ -28,6 +28,7 @@ D_SPEED = 20/3 # kts (check)
 
 AC_SPD = 150 # kts
 ALTITUDE = 350 # In FL
+MAX_ALT_CHANGE = 10*INTRUSION_DISTANCE
 
 NM2KM = 1.852
 MpS2Kt = 1.94384
@@ -182,7 +183,10 @@ class StaticObstacleEnvMod(gym.Env):
             
             points = [coord for point in p for coord in point] # Flatten the list of points
             poly_name = 'restricted_area_' + str(i+1)
-            bs.tools.areafilter.defineArea(poly_name, 'POLY', points)
+
+            # random obstacle height within range
+            alt = np.random.uniform(ALTITUDE-MAX_ALT_CHANGE/2, ALTITUDE+MAX_ALT_CHANGE/2)
+            bs.tools.areafilter.defineArea(poly_name, 'POLY', points, top=alt+INTRUSION_DISTANCE, bottom=alt-INTRUSION_DISTANCE)
             self.obstacle_names.append(poly_name)
 
             obstacle_vertices_coordinates = []
