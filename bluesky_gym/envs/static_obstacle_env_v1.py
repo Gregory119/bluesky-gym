@@ -43,6 +43,9 @@ CENTER = (51.990426702297746, 4.376124857109851) # TU Delft AE Faculty coordinat
 
 MAX_DISTANCE = 350 # width of screen in km
 
+ACTION_2_MS = 1.0
+
+
 class StaticObstacleEnvMod(gym.Env):
     """ 
     Static Obstacle Conflict Resolution Environment
@@ -68,7 +71,7 @@ class StaticObstacleEnvMod(gym.Env):
                 "cos_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
                 "sin_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
                 "altitude_difference": spaces.Box(-1, 1, shape = (NUM_OBSTACLES,), dtype=np.float64),
-                #"vertical_speed": spaces.Box(-1, 1, shape=(1,), dtype=np.float64),
+                "vertical_speed": spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float64),
             }
         )
        
@@ -284,6 +287,9 @@ class StaticObstacleEnvMod(gym.Env):
             altitude_difference.append(alt_dif)
         assert len(altitude_difference) == NUM_OBSTACLES
 
+        # Get agent vertical speed (normalized)
+        vertical_speed = np.array([bs.traf.selvs[0]]) / ACTION_2_MS
+
         observation = {
                 "destination_waypoint_distance": np.array(self.destination_waypoint_distance)/WAYPOINT_DISTANCE_MAX,
                 "destination_waypoint_cos_drift": np.array(self.destination_waypoint_cos_drift),
@@ -293,7 +299,7 @@ class StaticObstacleEnvMod(gym.Env):
                 "cos_difference_restricted_area_pos": np.array(self.obstacle_centre_cos_bearing),
                 "sin_difference_restricted_area_pos": np.array(self.obstacle_centre_sin_bearing),
                 "altitude_difference": np.array(altitude_difference)/MAX_ALT_CHANGE,
-                #"vertical_speed": vertical_speed,
+                "vertical_speed": vertical_speed,
             }
 
         return observation
