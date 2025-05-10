@@ -37,6 +37,7 @@ INTRUSION_PENALTY = -1
 D_HEADING = 22.5 # deg
 D_VELOCITY = 20/3 # kts
 
+VERT_BAND_PENALTY = INTRUSION_PENALTY # penalty for moving outside of vertical band
 ACTION_2_MS = 1  # this is low so that the AC doesn't exit the airspace too quickly
 
 
@@ -254,14 +255,20 @@ class SectorCREnvMod(gym.Env):
         }
     
     def _get_reward(self):
-        
+        reward = 0
         drift_reward = self._check_drift()
         intrusion_reward = self._check_intrusion()
 
-        total_reward = drift_reward + intrusion_reward
-        self.total_reward += total_reward
+        # add penalty for moving outside of vertical band
+        inside_vert, _ = self._check_inside_airspace()
+        if not inside_vert:
+            #print("vert band penalty")
+            reward += VERT_BAND_PENALTY
 
-        return total_reward
+        reward += drift_reward + intrusion_reward
+        self.total_reward += reward
+
+        return reward
     
     def _get_observation(self):
 
