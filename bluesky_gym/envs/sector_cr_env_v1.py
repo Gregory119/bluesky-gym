@@ -308,21 +308,28 @@ class SectorCREnvMod(gym.Env):
         vy = np.sin(np.deg2rad(ac_hdg)) * bs.traf.tas[ac_idx]
 
         ac_loc = fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[ac_idx], bs.traf.lon[ac_idx]])) * NM2KM * 1000 # Two-step conversion lat/long -> NM -> m
-        distances = [fn.euclidean_distance(ac_loc, fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[i], bs.traf.lon[i]])) * NM2KM * 1000) for i in range(1, self.num_ac)]
+
+        # it's extremely important to order these state values in a deterministic way for learning
+        def get3dDist(i):
+            hor_dist = fn.euclidean_distance(ac_loc, fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[i], bs.traf.lon[i]])) * NM2KM * 1000)
+            ver_dist = (bs.traf.alt[i] - bs.traf.alt[ac_idx]) * NM2KM * 1000
+            return np.sqrt(ver_dist**2 + hor_dist**2)
+            
+        distances = [get3dDist(i) for i in range(1, self.num_ac)]
         ac_idx_by_dist = np.argsort(distances)
 
         for i in range(self.num_ac-1):
-            ac_idx = ac_idx_by_dist[i]+1
-            int_hdg = bs.traf.hdg[ac_idx]
+            int_idx = ac_idx_by_dist[i]+1
+            int_hdg = bs.traf.hdg[int_idx]
             
             # Intruder AC relative position, m
-            int_loc = fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[ac_idx], bs.traf.lon[ac_idx]])) * NM2KM * 1000
+            int_loc = fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[int_idx], bs.traf.lon[int_idx]])) * NM2KM * 1000
             self.x_r = np.append(self.x_r, int_loc[0] - ac_loc[0])
             self.y_r = np.append(self.y_r, int_loc[1] - ac_loc[1])
             
             # Intruder AC relative velocity, m/s
-            vx_int = np.cos(np.deg2rad(int_hdg)) * bs.traf.tas[ac_idx]
-            vy_int = np.sin(np.deg2rad(int_hdg)) * bs.traf.tas[ac_idx]
+            vx_int = np.cos(np.deg2rad(int_hdg)) * bs.traf.tas[int_idx]
+            vy_int = np.sin(np.deg2rad(int_hdg)) * bs.traf.tas[int_idx]
             self.vx_r = np.append(self.vx_r, vx_int - vx)
             self.vy_r = np.append(self.vy_r, vy_int - vy)
 
@@ -331,12 +338,10 @@ class SectorCREnvMod(gym.Env):
             self.cos_track = np.append(self.cos_track, np.cos(track))
             self.sin_track = np.append(self.sin_track, np.sin(track))
 
-            self.distances = np.append(self.distances, distances[ac_idx-1])
+            self.distances = np.append(self.distances, distances[int_idx-1])
 
-        ac_idx = bs.traf.id2idx(ACTOR)
-        for i in range(self.num_ac-1):
-            int_idx = i+1
-            # Intruder altitude difference to AC
+            # Intruder altitude difference to AC. This must be done in this loop
+            # so that the altitude differences are sorted by distance.
             alt_dif = bs.traf.alt[int_idx] - bs.traf.alt[ac_idx]
             altitude_difference.append(alt_dif)
         assert len(altitude_difference) == NUM_INTRUDERS
