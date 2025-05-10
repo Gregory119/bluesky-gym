@@ -67,8 +67,8 @@ class SectorCREnvMod(gym.Env):
                 "sin(track)": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
                 "distances": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
                 # new
-                "altitude_difference": spaces.Box(-1, 1, shape = (NUM_INTRUDERS,), dtype=np.float64),
-                "vertical_speed": spaces.Box(-1, 1, shape=(1,), dtype=np.float64),
+                "altitude_difference": spaces.Box(-np.inf, np.inf, shape = (NUM_INTRUDERS,), dtype=np.float64),
+                "vertical_speed": spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float64),
             }
         )
 
