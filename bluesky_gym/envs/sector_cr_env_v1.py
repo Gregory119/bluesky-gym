@@ -26,7 +26,7 @@ NM2KM = 1.852
 MpS2Kt = 1.94384
 FL2M = 30.48
 
-INTRUSION_DISTANCE = 3*5 # NM, increased this by 3 times so that the AC would be intruded more often
+INTRUSION_DISTANCE = 2*5 # NM, increased this so that the AC would be intruded more often
 MAX_ALT_CHANGE = 10*INTRUSION_DISTANCE # distance between lower and upper altitude bounds of airspace
 
 # Model parameters
@@ -37,6 +37,7 @@ INTRUSION_PENALTY = -1
 D_HEADING = 22.5 # deg
 D_VELOCITY = 20/3 # kts
 
+VERT_BAND_PENALTY = INTRUSION_PENALTY # penalty for moving outside of vertical band
 ACTION_2_MS = 1  # this is low so that the AC doesn't exit the airspace too quickly
 
 
@@ -66,8 +67,8 @@ class SectorCREnvMod(gym.Env):
                 "sin(track)": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
                 "distances": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
                 # new
-                "altitude_difference": spaces.Box(-1, 1, shape = (NUM_INTRUDERS,), dtype=np.float64),
-                #"vz_r": spaces.Box(-np.inf, np.inf, shape=(NUM_INTRUDERS,), dtype=np.float64),
+                "altitude_difference": spaces.Box(-np.inf, np.inf, shape = (NUM_INTRUDERS,), dtype=np.float64),
+                "vertical_speed": spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float64),
             }
         )
 
@@ -142,9 +143,11 @@ class SectorCREnvMod(gym.Env):
         info = self._get_info()
 
         # terminate when moving outside the airspaceg
-        terminate = not self._check_inside_airspace()
+        inside_vert, inside_hor = self._check_inside_airspace()
+        terminate = False
+        truncate = not inside_hor
 
-        return observation, reward, terminate, False, info
+        return observation, reward, terminate, truncate, info
     
     def _check_inside_airspace(self):
         ac_idx = bs.traf.id2idx(ACTOR)
@@ -157,12 +160,8 @@ class SectorCREnvMod(gym.Env):
 
         # print("curr alt: {}".format(curr_alt))
         # print("upper limit: {}, lower limit: {}".format(upper_vert, lower_vert))
-        
-        if not inside:
-            # print("!!!!!!!!!!outside airspace")
-            return False
-        else:
-            return True
+
+        return inside_vertical, inside_horizontal
 
     def _generate_polygon(self):
         
@@ -252,14 +251,20 @@ class SectorCREnvMod(gym.Env):
         }
     
     def _get_reward(self):
-        
+        reward = 0
         drift_reward = self._check_drift()
         intrusion_reward = self._check_intrusion()
 
-        total_reward = drift_reward + intrusion_reward
-        self.total_reward += total_reward
+        # add penalty for moving outside of vertical band
+        inside_vert, _ = self._check_inside_airspace()
+        if not inside_vert:
+            #print("vert band penalty")
+            reward += VERT_BAND_PENALTY
 
-        return total_reward
+        reward += drift_reward + intrusion_reward
+        self.total_reward += reward
+
+        return reward
     
     def _get_observation(self):
 
@@ -296,25 +301,35 @@ class SectorCREnvMod(gym.Env):
         # Get agent aircraft airspeed, m/s
         self.airspeed = np.append(self.airspeed, bs.traf.tas[ac_idx])
 
+        # Get agent vertical speed (normalized)
+        vertical_speed = np.array([bs.traf.selvs[0]]) / ACTION_2_MS
+
         vx = np.cos(np.deg2rad(ac_hdg)) * bs.traf.tas[ac_idx]
         vy = np.sin(np.deg2rad(ac_hdg)) * bs.traf.tas[ac_idx]
 
         ac_loc = fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[ac_idx], bs.traf.lon[ac_idx]])) * NM2KM * 1000 # Two-step conversion lat/long -> NM -> m
-        distances = [fn.euclidean_distance(ac_loc, fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[i], bs.traf.lon[i]])) * NM2KM * 1000) for i in range(1, self.num_ac)]
+
+        # it's extremely important to order these state values in a deterministic way for learning
+        def get3dDist(i):
+            hor_dist = fn.euclidean_distance(ac_loc, fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[i], bs.traf.lon[i]])) * NM2KM * 1000)
+            ver_dist = (bs.traf.alt[i] - bs.traf.alt[ac_idx]) * NM2KM * 1000
+            return np.sqrt(ver_dist**2 + hor_dist**2)
+            
+        distances = [get3dDist(i) for i in range(1, self.num_ac)]
         ac_idx_by_dist = np.argsort(distances)
 
         for i in range(self.num_ac-1):
-            ac_idx = ac_idx_by_dist[i]+1
-            int_hdg = bs.traf.hdg[ac_idx]
+            int_idx = ac_idx_by_dist[i]+1
+            int_hdg = bs.traf.hdg[int_idx]
             
             # Intruder AC relative position, m
-            int_loc = fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[ac_idx], bs.traf.lon[ac_idx]])) * NM2KM * 1000
+            int_loc = fn.latlong_to_nm(CENTER, np.array([bs.traf.lat[int_idx], bs.traf.lon[int_idx]])) * NM2KM * 1000
             self.x_r = np.append(self.x_r, int_loc[0] - ac_loc[0])
             self.y_r = np.append(self.y_r, int_loc[1] - ac_loc[1])
             
             # Intruder AC relative velocity, m/s
-            vx_int = np.cos(np.deg2rad(int_hdg)) * bs.traf.tas[ac_idx]
-            vy_int = np.sin(np.deg2rad(int_hdg)) * bs.traf.tas[ac_idx]
+            vx_int = np.cos(np.deg2rad(int_hdg)) * bs.traf.tas[int_idx]
+            vy_int = np.sin(np.deg2rad(int_hdg)) * bs.traf.tas[int_idx]
             self.vx_r = np.append(self.vx_r, vx_int - vx)
             self.vy_r = np.append(self.vy_r, vy_int - vy)
 
@@ -323,12 +338,10 @@ class SectorCREnvMod(gym.Env):
             self.cos_track = np.append(self.cos_track, np.cos(track))
             self.sin_track = np.append(self.sin_track, np.sin(track))
 
-            self.distances = np.append(self.distances, distances[ac_idx-1])
+            self.distances = np.append(self.distances, distances[int_idx-1])
 
-        ac_idx = bs.traf.id2idx(ACTOR)
-        for i in range(self.num_ac-1):
-            int_idx = i+1
-            # Intruder altitude difference to AC
+            # Intruder altitude difference to AC. This must be done in this loop
+            # so that the altitude differences are sorted by distance.
             alt_dif = bs.traf.alt[int_idx] - bs.traf.alt[ac_idx]
             altitude_difference.append(alt_dif)
         assert len(altitude_difference) == NUM_INTRUDERS
@@ -345,6 +358,7 @@ class SectorCREnvMod(gym.Env):
             "sin(track)": self.sin_track[:NUM_INTRUDERS],
             "distances": (self.distances[:NUM_INTRUDERS]-50000.)/15000,
             "altitude_difference": np.array(altitude_difference)/MAX_ALT_CHANGE,
+            "vertical_speed": vertical_speed,
         }
 
         return observation
@@ -430,8 +444,13 @@ class SectorCREnvMod(gym.Env):
         x_pos = (self.window_width/2)+(np.cos(np.deg2rad(ac_qdr))*(ac_dis * NM2KM)*px_per_km)
         y_pos = (self.window_height/2)-(np.sin(np.deg2rad(ac_qdr))*(ac_dis * NM2KM)*px_per_km)
 
+        color = (0,0,0)
+        inside_vert, _ = self._check_inside_airspace()
+        if not inside_vert or (self._check_intrusion() < 0): # intrusion
+            color = (220,20,60) # red
+            
         pygame.draw.line(canvas,
-            (0,0,0),
+            color,
             (x_pos,y_pos),
             ((x_pos)+heading_end_x,(y_pos)-heading_end_y),
             width = 4

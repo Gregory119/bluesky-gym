@@ -70,7 +70,7 @@ class StaticObstacleEnvMod(gym.Env):
                 "restricted_area_distance": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES, ), dtype=np.float64),
                 "cos_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
                 "sin_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
-                "altitude_difference": spaces.Box(-1, 1, shape = (NUM_OBSTACLES,), dtype=np.float64),
+                "altitude_difference": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
                 "vertical_speed": spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float64),
             }
         )
@@ -412,8 +412,15 @@ class StaticObstacleEnvMod(gym.Env):
         dis = dis*NM2KM
         x_actor = ((np.sin(np.deg2rad(qdr))*dis)/MAX_DISTANCE)*self.window_width
         y_actor = ((-np.cos(np.deg2rad(qdr))*dis)/MAX_DISTANCE)*self.window_width
+
+        # set colors of ship based on intrusion
+        _, terminate = self._check_intrusion()
+
+        color = (0,0,0) # black
+        if terminate:
+            color = (235, 52, 52) # red
         pygame.draw.line(canvas,
-            (235, 52, 52),
+            color,
             (x_actor, y_actor),
             (x_actor+heading_end_x, y_actor-heading_end_y),
             width = 5
