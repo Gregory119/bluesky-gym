@@ -70,7 +70,7 @@ class StaticObstacleEnvMod(gym.Env):
                 "restricted_area_distance": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES, ), dtype=np.float64),
                 "cos_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
                 "sin_difference_restricted_area_pos": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
-                "altitude_difference": spaces.Box(-1, 1, shape = (NUM_OBSTACLES,), dtype=np.float64),
+                "altitude_difference": spaces.Box(-np.inf, np.inf, shape = (NUM_OBSTACLES,), dtype=np.float64),
                 "vertical_speed": spaces.Box(-np.inf, np.inf, shape=(1,), dtype=np.float64),
             }
         )
