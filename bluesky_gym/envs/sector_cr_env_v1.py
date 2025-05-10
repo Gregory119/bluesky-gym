@@ -444,8 +444,13 @@ class SectorCREnvMod(gym.Env):
         x_pos = (self.window_width/2)+(np.cos(np.deg2rad(ac_qdr))*(ac_dis * NM2KM)*px_per_km)
         y_pos = (self.window_height/2)-(np.sin(np.deg2rad(ac_qdr))*(ac_dis * NM2KM)*px_per_km)
 
+        color = (0,0,0)
+        inside_vert, _ = self._check_inside_airspace()
+        if not inside_vert or (self._check_intrusion() < 0): # intrusion
+            color = (220,20,60) # red
+            
         pygame.draw.line(canvas,
-            (0,0,0),
+            color,
             (x_pos,y_pos),
             ((x_pos)+heading_end_x,(y_pos)-heading_end_y),
             width = 4
