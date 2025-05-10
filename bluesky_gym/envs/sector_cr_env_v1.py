@@ -26,7 +26,7 @@ NM2KM = 1.852
 MpS2Kt = 1.94384
 FL2M = 30.48
 
-INTRUSION_DISTANCE = 3*5 # NM, increased this by 3 times so that the AC would be intruded more often
+INTRUSION_DISTANCE = 2*5 # NM, increased this so that the AC would be intruded more often
 MAX_ALT_CHANGE = 10*INTRUSION_DISTANCE # distance between lower and upper altitude bounds of airspace
 
 # Model parameters
