@@ -144,12 +144,8 @@ class SectorCREnvMod(gym.Env):
 
         # terminate when moving outside the airspaceg
         inside_vert, inside_hor = self._check_inside_airspace()
-        terminate = not inside_hor
-
-        # Allow the AC to move above or below all the intruders and then exit
-        # the airspace horizontally. So don't terminate or truncate when outside
-        # vertical airspace/band.
-        truncate = False
+        terminate = False
+        truncate = not inside_hor
 
         return observation, reward, terminate, truncate, info
     
