@@ -46,7 +46,7 @@ Issues = "https://github.com/TUDelft-CNS-ATM/bluesky-gym/issues"
 # ]
 
 [tool.poetry]
-name = "rbe-595-reinforcement-learning-project"
+name = "blue-sky"
 version = "0.1.0"
 description = "A gymnasium style environment for standardized Reinforcement Learning research in Air Traffic Management."
 authors = ["Gregory Jones <greggie119gj@gmail.com>"]
@@ -56,19 +56,19 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.12"
 numpy = "2.2.3"
-torch = {version = "^2.6.0+cu118", source = "pytorch-gpu-src"}
-torchvision = {version = "^0.21.0+cu118", source = "pytorch-gpu-src"}
-torchaudio = {version = "^2.6.0+cu118", source = "pytorch-gpu-src"}
 gymnasium = {extras = ["box2d"], version = "^1.1.1"}
 tensorboard = "^2.19.0"
 debugpy = "^1.8.13"
 pygame = "^2.6.1"
 scipy = "^1.15.2"
 stable-baselines3 = {extras = ["extra"], version = "^2.6.0"}
+torch = {version = "^2.7.1+cu118", source = "pytorch-gpu-src"}
+torchvision = {version = "^0.22.1+cu118", source = "pytorch-gpu-src"}
+torchaudio = {version = "^2.7.1+cu118", source = "pytorch-gpu-src"}
 
 [[tool.poetry.source]]
 name = "pytorch-gpu-src"
-url = "https://download.pytorch.org/whl/cu118"
+url = "https://download.pytorch.org/whl/cu128"
 priority = "explicit"
 
 [build-system]
